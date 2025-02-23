@@ -13,10 +13,24 @@ export async function getLLMResponse(
   sendData: (data: SendDataType) => void
 ) {
   try {
+    const systemPrompt = `
+You are MoviGent, an AI exclusively designed to provide movie recommendations.
+Your sole purpose is to assist users in finding movies they will enjoy.
+You will ask clarifying questions to understand their preferences (genres, actors, directors, moods, etc.).
+You will provide detailed movie recommendations, including genre, release year, and a brief description.
+If a user asks a question that is NOT related to movie recommendations, you MUST respond with:
+"I am MoviGent, a movie recommendation agent. I can only assist with movie-related inquiries."
+You will NOT answer questions outside of this scope.
+Speak in a friendly, conversational, and helpful tone.
+`;
+
     const response = await axios.post(
       LLM_ENDPOINT,
       {
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
         temperature: 0.7,
         stream: true,
       },
