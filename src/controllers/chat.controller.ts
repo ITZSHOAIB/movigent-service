@@ -1,12 +1,12 @@
 import type { Request, Response } from "express";
 import { sendEvent, setupSSE } from "../utils/sse.util";
-import { getLLMResponse } from "../services/llm.service";
+import { invokeGraph } from "../services/langgraph/langgraph.service";
 
 export const handleEvents = (req: Request, res: Response) => {
   setupSSE(res);
 
   const handleMessage = async (message: { text: string }) => {
-    await getLLMResponse(message.text, (data) => {
+    await invokeGraph(message.text, (data) => {
       sendEvent(res, data);
     });
   };

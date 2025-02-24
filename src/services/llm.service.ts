@@ -8,7 +8,7 @@ export type SendDataType = {
   text?: string;
 };
 
-export async function getLLMResponse(
+export async function streamLLMResponse(
   prompt: string,
   sendData: (data: SendDataType) => void
 ) {
