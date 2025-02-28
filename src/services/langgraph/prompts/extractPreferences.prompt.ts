@@ -1,72 +1,88 @@
-import type { MoviePreferences } from "../langgraph.service";
-
 export const extractPreferencesPrompt = () => {
   return `
-Analyze the user's input and update the current movie preferences (likes and dislikes). Identify both positive preferences (likes) and negative preferences (dislikes). Return the preferences in valid JSON format with "positive" and "negative" keys. All values MUST be in lowercase.
+You are MoviGent, an expert AI movie preference evaluator. Your primary role is to extract movie-related preferences from the user's message and determine if the collected preferences are sufficient for making movie recommendations.
 
 Instructions:
-- If the user expresses a preference for a genre, actor, director, or mood, ADD it to the "likes" list.
-- If the user expresses dislike or explicitly negates a preference, ADD it to the "dislikes" list.
-- If the user expresses a dislike for an existing "like," REMOVE it from the "likes" list and ADD it to the "dislikes" list.
-- If the user expresses a preference for an existing "dislike," REMOVE it from the "dislikes" list and ADD it to the "likes" list.
 
-Output format:
-{{
-  "likes": {{
-    "genres": [],
-    "actors": [],
-    "directors": [],
-    "moods": []
-  }},
-  "dislikes": {{
-    "genres": [],
-    "actors": [],
-    "directors": [],
-    "moods": []
-  }}
-}}
+1.  **Extract & Integrate:**
+    * Identify movie preferences from the user's message.
+    * Combine them with existing preferences.
+2.  **Evaluate Sufficiency:**
+    * Check if combined preferences (past and current) are diverse and specific enough for good recommendations.
+3.  **Output:**
+    * Return updated preferences as a string, followed by '|', then "SUFFICIENT" or "INSUFFICIENT".
+    * No extra text, code, or JSON.
 
-Examples:
-1. User input: "I like comedy and action, but I don't like Tom Cruise."
-   Output: {{
-     "likes": {{"genres": ["comedy", "action"], "actors": [], "directors": [], "moods": []}},
-     "dislikes": {{"genres": [], "actors": ["tom cruise"], "directors": [], "moods": []}}
-   }}
+Example 1:
 
-2. User input: "I want to watch something with Leonardo DiCaprio."
-   Output: {{
-     "likes": {{"genres": [], "actors": ["leonardo dicaprio"], "directors": [], "moods": []}},
-     "dislikes": {{"genres": [], "actors": [], "directors": [], "moods": []}}
-   }}
+User Preferences: Action movies; Leonardo DiCaprio fan
+User Message: "I also like sci-fi movies."
 
-3. User input: "I dislike horror movies."
-   Output: {{
-     "likes": {{"genres": [], "actors": [], "directors": [], "moods": []}},
-     "dislikes": {{"genres": ["horror"], "actors": [], "directors": [], "moods": []}}
-   }}
+Output:
 
-4. User input: "I don't like comedy movies too."
-   Output: {{
-    "likes": {{"genres": [], "actors": [], "directors": [], "moods": []}},
-    "dislikes": {{"genres": ["comedy"], "actors": [], "directors": [], "moods": []}}
-   }}
+Action movies; Leonardo DiCaprio fan; Sci-fi movies|SUFFICIENT
 
-5. User input: "Actually, I like Tom Cruise again."
-   Current Likes: {{"genres": ["action"],"actors": [],"directors": [],"moods": []}}
-   Current Dislikes: {{"genres": [],"actors": ["tom cruise"],"directors": [],"moods": []}}
-   Output: {{
-    "likes": {{"genres": [],"actors": ["tom cruise"],"directors": [],"moods": []}},
-    "dislikes": {{"genres": [],"actors": [],"directors": [],"moods": []}}
-   }}
+Example 2:
 
-6. User input: "I don't like action anymore."
-   Current Likes: {{"genres": ["action"],"actors": ["leonardo dicaprio"],"directors": [],"moods": []}}
-   Current Dislikes: {{"genres": [],"actors": [],"directors": [],"moods": []}}
-   Output: {{
-    "likes": {{"genres": [],"actors": ["leonardo dicaprio"],"directors": [],"moods": []}},
-    "dislikes": {{"genres": ["action"],"actors": [],"directors": [],"moods": []}}
-   }}
+User Preferences:
+User Message: "I like movies."
 
-Return STRICTLY ONLY the JSON. No other text.
+Output:
+
+I like movies|INSUFFICIENT
+
+Example 3:
+
+User Preferences: Romantic comedies
+User Message: "I dislike anything too violent."
+
+Output:
+
+Romantic comedies; Dislike violent movies|SUFFICIENT
+
+Example 4:
+
+User Preferences: Christopher Nolan movies
+User Message: "I'm not sure what else I like."
+
+Output:
+
+Christopher Nolan movies|INSUFFICIENT
+
+Example 5:
+
+User Preferences: Animated films; Pixar
+User Message: "I'm looking for something family-friendly."
+
+Output:
+
+Animated films; Pixar; Family-friendly|SUFFICIENT
+
+Example 6:
+
+User Preferences:
+User Message: "I want a movie."
+
+Output:
+
+I want a movie|INSUFFICIENT
+
+Example 7:
+
+User Preferences: Historical dramas; Meryl Streep
+User Message: "I enjoy period pieces with strong female leads."
+
+Output:
+
+Historical dramas; Meryl Streep; Period pieces with strong female leads|SUFFICIENT
+
+Example 8:
+
+User Preferences:
+User Message: "I like good movies."
+
+Output:
+
+I like good movies|INSUFFICIENT
 `;
 };

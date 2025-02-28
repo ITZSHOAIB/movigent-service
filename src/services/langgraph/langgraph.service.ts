@@ -1,5 +1,6 @@
 import {
   Annotation,
+  Command,
   END,
   messagesStateReducer,
   START,
@@ -16,6 +17,7 @@ import { StringOutputParser } from "@langchain/core/output_parsers";
 import { extractPreferencesPrompt } from "./prompts/extractPreferences.prompt";
 import { suggestMoviesPrompt } from "./prompts/suggestMovies.prompt";
 import { thinkingMessages, welcomeMessages } from "./messages";
+import { investigatePreferencesPrompt } from "./prompts/investigatePreferences.prompt";
 
 const LLM_API_URL = process.env.LLM_API_URL || "http://localhost:1234";
 const LLM_ENDPOINT = `${LLM_API_URL}/v1`;
@@ -24,12 +26,6 @@ export type SendDataType = {
   type: "chat" | "end" | "error";
   text?: string;
 };
-export interface MoviePreferences {
-  genres: string[];
-  actors: string[];
-  directors: string[];
-  moods: string[];
-}
 
 // define graphstate which will be used to store messages along with movie preferences
 const graphState = Annotation.Root({
@@ -37,47 +33,9 @@ const graphState = Annotation.Root({
     reducer: messagesStateReducer,
     default: () => [],
   }),
-  likes: Annotation<MoviePreferences>({
-    reducer: (left: MoviePreferences | undefined, right: MoviePreferences) => {
-      if (!left) {
-        return right;
-      }
-      return {
-        genres: [...new Set([...(left.genres || []), ...(right.genres || [])])],
-        actors: [...new Set([...(left.actors || []), ...(right.actors || [])])],
-        directors: [
-          ...new Set([...(left.directors || []), ...(right.directors || [])]),
-        ],
-        moods: [...new Set([...(left.moods || []), ...(right.moods || [])])],
-      };
-    },
-    default: () => ({
-      genres: [],
-      actors: [],
-      directors: [],
-      moods: [],
-    }),
-  }),
-  dislikes: Annotation<MoviePreferences>({
-    reducer: (left: MoviePreferences | undefined, right: MoviePreferences) => {
-      if (!left) {
-        return right;
-      }
-      return {
-        genres: [...new Set([...(left.genres || []), ...(right.genres || [])])],
-        actors: [...new Set([...(left.actors || []), ...(right.actors || [])])],
-        directors: [
-          ...new Set([...(left.directors || []), ...(right.directors || [])]),
-        ],
-        moods: [...new Set([...(left.moods || []), ...(right.moods || [])])],
-      };
-    },
-    default: () => ({
-      genres: [],
-      actors: [],
-      directors: [],
-      moods: [],
-    }),
+  preferences: Annotation<string>({
+    reducer: (left: string, right: string) => right,
+    default: () => "",
   }),
   isFirstMessage: Annotation<boolean>({
     reducer: (left: boolean | undefined, right: boolean) => right,
@@ -112,61 +70,87 @@ async function earlyResponse(state: typeof graphState.State) {
   }
   return {
     isFirstMessage: false,
-    messages: [...state.messages, new AIMessage(message)],
   };
 }
 
-// Extract preferences from user input
 async function extractPreferences(state: typeof graphState.State) {
-  const { messages, likes, dislikes } = state;
+  console.log("[extractPreferences] called");
+  const { messages, preferences } = state;
   const prompt = ChatPromptTemplate.fromMessages([
     ["system", extractPreferencesPrompt()],
     [
       "human",
-      `Input: {messages}
-      
-      Current Preferences: 
-      likes: {likes}, 
-      dislikes: {dislikes}`,
+      `User Preferences: {preferences}
+       User Message: {message}`,
     ],
   ]);
   const chain = prompt.pipe(model).pipe(new StringOutputParser());
+
+  const humanMessages = messages.filter((msg) => msg.getType() === "human");
   const response = await chain.invoke({
-    messages,
-    likes: likes,
-    dislikes: dislikes,
+    message: humanMessages[humanMessages.length - 1].content,
+    preferences,
   });
 
-  try {
-    const preferences: {
-      likes: MoviePreferences;
-      dislikes: MoviePreferences;
-    } = JSON.parse(response.trim());
-    const { likes, dislikes } = preferences;
+  console.log("Extracted preferences - ", response);
+  const [updatedPreferences, sufficiency] = response.split("|");
 
-    return { likes, dislikes };
-  } catch (error) {
-    console.log("Error parsing preferences", error);
-    return state;
-  }
+  const isSufficient = !sufficiency.includes("INSUFFICIENT");
+  return new Command({
+    update: {
+      preferences: isSufficient ? updatedPreferences : preferences,
+    },
+    goto: isSufficient ? "suggestMovies" : "investigatePreferences",
+  });
 }
 
-// Suggest movies based on user preferences
-async function suggestMovies(state: typeof graphState.State) {
-  const likes = state.likes;
-  const dislikes = state.dislikes;
+async function investigatePreferences(state: typeof graphState.State) {
+  console.log("[investigatePreferences] called");
   const messages = state.messages;
+  const preferences = state.preferences;
   const prompt = ChatPromptTemplate.fromMessages([
-    ["system", suggestMoviesPrompt()],
-    ["human", "{messages}"],
+    ["system", investigatePreferencesPrompt()],
+    [
+      "human",
+      `User Preferences: {preferences}
+       User Message: {message}`,
+    ],
   ]);
   const chain = prompt.pipe(model).pipe(new StringOutputParser());
 
   let fullResponse = "";
+  const humanMessages = messages.filter((msg) => msg.getType() === "human");
   for await (const chunk of await chain.stream({
-    likes,
-    dislikes,
-    messages,
+    message: humanMessages[humanMessages.length - 1].content,
+    preferences,
+  })) {
+    fullResponse += chunk;
+    if (globalSendData) globalSendData({ type: "chat", text: chunk });
+  }
+  if (globalSendData) globalSendData({ type: "end" });
+  return { messages: [...state.messages, new AIMessage(fullResponse)] };
+}
+
+// Suggest movies based on user preferences
+async function suggestMovies(state: typeof graphState.State) {
+  console.log("[suggestMovies] called");
+  const messages = state.messages;
+  const preferences = state.preferences;
+  const prompt = ChatPromptTemplate.fromMessages([
+    ["system", suggestMoviesPrompt()],
+    [
+      "human",
+      `User Preferences: {preferences}
+      User Message: {message}`,
+    ],
+  ]);
+  const chain = prompt.pipe(model).pipe(new StringOutputParser());
+
+  let fullResponse = "";
+  const humanMessages = messages.filter((msg) => msg.getType() === "human");
+  for await (const chunk of await chain.stream({
+    message: humanMessages[humanMessages.length - 1].content,
+    preferences,
   })) {
     fullResponse += chunk;
     if (globalSendData) globalSendData({ type: "chat", text: chunk });
@@ -177,12 +161,13 @@ async function suggestMovies(state: typeof graphState.State) {
 
 const graph = new StateGraph(graphState)
   .addNode("earlyResponse", earlyResponse)
-  .addNode("extractPreferences", extractPreferences)
+  .addNode("extractPreferences", extractPreferences, {
+    ends: ["suggestMovies", "investigatePreferences"],
+  })
+  .addNode("investigatePreferences", investigatePreferences)
   .addNode("suggestMovies", suggestMovies)
   .addEdge(START, "earlyResponse")
   .addEdge("earlyResponse", "extractPreferences")
-  .addEdge("extractPreferences", "suggestMovies")
-  .addEdge("suggestMovies", END)
   .compile();
 
 let globalSendData: (data: SendDataType) => void = () => {};
@@ -193,16 +178,14 @@ export const invokeGraph = async (
   globalSendData = sendData;
   const currentState = memory.get("sessionId") || {
     messages: [],
-    likes: { genres: [], actors: [], directors: [], moods: [] },
-    dislikes: { genres: [], actors: [], directors: [], moods: [] },
+    preferences: "",
     isFirstMessage: true,
   };
 
-  // currentState.messages.push(new SystemMessage(systemPrompt));
   currentState.messages.push(new HumanMessage(prompt));
 
   const updatedState = await graph.invoke(currentState);
 
   memory.set("sessionId", updatedState);
-  console.log("Updated state", updatedState);
+  // console.log("Updated state", updatedState);
 };
