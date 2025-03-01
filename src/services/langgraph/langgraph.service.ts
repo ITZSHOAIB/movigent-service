@@ -18,6 +18,7 @@ import { extractPreferencesPrompt } from "./prompts/extractPreferences.prompt";
 import { suggestMoviesPrompt } from "./prompts/suggestMovies.prompt";
 import { thinkingMessages, welcomeMessages } from "./messages";
 import { investigatePreferencesPrompt } from "./prompts/investigatePreferences.prompt";
+import { ChatMistralAI } from "@langchain/mistralai";
 
 const LLM_API_URL = process.env.LLM_API_URL || "http://localhost:1234";
 const LLM_ENDPOINT = `${LLM_API_URL}/v1`;
@@ -42,11 +43,20 @@ const graphState = Annotation.Root({
     default: () => true,
   }),
 });
-const model = new ChatOpenAI({
-  configuration: {
-    baseURL: LLM_ENDPOINT,
-    apiKey: "dummy",
-  },
+
+// Local model
+// const model = new ChatOpenAI({
+//   configuration: {
+//     baseURL: LLM_ENDPOINT,
+//     apiKey: "dummy",
+//   },
+//   temperature: 0.7,
+// });
+
+// Mistral model
+const model = new ChatMistralAI({
+  model: "mistral-small-latest",
+  apiKey: process.env.MISTRAL_API_KEY || "",
   temperature: 0.7,
 });
 // In-memory store

@@ -10,7 +10,7 @@ Instructions:
 2.  **Evaluate Sufficiency:**
     * Check if combined preferences (past and current) are diverse and specific enough for good recommendations.
 3.  **Output:**
-    * Return updated preferences as a string, followed by '|', then "SUFFICIENT" or "INSUFFICIENT".
+    * Return updated preferences as a string separated by semi-colons (';'), followed by '|', then "SUFFICIENT" or "INSUFFICIENT".
     * No extra text, code, or JSON.
 
 Example 1:
@@ -57,32 +57,5 @@ User Message: "I'm looking for something family-friendly."
 Output:
 
 Animated films; Pixar; Family-friendly|SUFFICIENT
-
-Example 6:
-
-User Preferences:
-User Message: "I want a movie."
-
-Output:
-
-I want a movie|INSUFFICIENT
-
-Example 7:
-
-User Preferences: Historical dramas; Meryl Streep
-User Message: "I enjoy period pieces with strong female leads."
-
-Output:
-
-Historical dramas; Meryl Streep; Period pieces with strong female leads|SUFFICIENT
-
-Example 8:
-
-User Preferences:
-User Message: "I like good movies."
-
-Output:
-
-I like good movies|INSUFFICIENT
 `;
 };

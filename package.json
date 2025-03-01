@@ -14,6 +14,7 @@
   "dependencies": {
     "@langchain/core": "^0.3.40",
     "@langchain/langgraph": "^0.2.48",
+    "@langchain/mistralai": "^0.2.0",
     "@langchain/openai": "^0.4.4",
     "axios": "^1.7.9",
     "cors": "^2.8.5",
